@@ -16,9 +16,6 @@ local.properties
 *.dex
 *.class
 
-# ---- Build artifact made from source: run the Gradle task, do not commit it ----
-app/libs/*.aar
-
 # ---- Go ----
 tunnel/go.work
 tunnel/go.work.sum
