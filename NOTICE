@@ -1,0 +1,46 @@
+hermes-android-lite
+Copyright 2026 robbe1912
+
+Licensed under the Apache License, Version 2.0. The license text is in the LICENSE file.
+The app contains the parts below under their own licenses. Each part keeps its copyright
+notice and license text in its source.
+
+Tailscale client library
+  tailscale.com                              BSD-3-Clause  https://github.com/tailscale/tailscale
+  github.com/tailscale/peercred              BSD-3-Clause
+  github.com/tailscale/wireguard-go          MIT
+  github.com/gaissmai/bart                   MIT
+  github.com/mdlayher/socket                 MIT
+  github.com/creachadair/msync               BSD-3-Clause
+  github.com/hdevalence/ed25519consensus     BSD-3-Clause
+
+Go language parts
+  The Go standard library and runtime        BSD-3-Clause  https://go.dev/LICENSE
+  golang.org/x/mobile (gomobile, gobind)     BSD-3-Clause
+  golang.org/x/crypto, net, oauth2, sync, sys, term, text, time, exp   BSD-3-Clause
+  github.com/go-json-experiment/json         BSD-3-Clause
+  filippo.io/edwards25519                    BSD-3-Clause
+  github.com/huin/goupnp                      BSD-3-Clause
+  go4.org/netipx                              BSD-3-Clause
+  github.com/fxamacker/cbor/v2               MIT
+  github.com/x448/float16                    MIT
+  gvisor.dev/gvisor                           Apache-2.0
+  github.com/golang/groupcache                Apache-2.0
+  github.com/google/btree                     Apache-2.0
+  github.com/klauspost/compress               Apache-2.0
+  github.com/pires/go-proxyproto              Apache-2.0
+  go4.org/mem                                 Apache-2.0
+
+Android parts
+  AndroidX and Jetpack: Compose, Material, DataStore, Activity, Lifecycle, Core   Apache-2.0
+  Material Design icons                      Apache-2.0
+  Kotlin Standard Library                    Apache-2.0
+  kotlinx.coroutines, kotlinx.serialization  Apache-2.0
+  OkHttp, Okio                               Apache-2.0
+
+Firebase
+  Firebase SDK for Android and Firebase Cloud Messaging come from Google.
+  Terms: https://firebase.google.com/support/terms
+  The repository holds no Firebase project file. Each user adds their own project in the app.
+
+Names here are for identification only. Their owners do not sponsor this app.

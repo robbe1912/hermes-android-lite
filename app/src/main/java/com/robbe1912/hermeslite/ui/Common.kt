@@ -1,5 +1,6 @@
 package com.robbe1912.hermeslite.ui
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
@@ -206,3 +207,8 @@ internal fun RootBar(selected: RootTab, onSelect: (RootTab) -> Unit) {
         }
     }
 }
+
+/** The version name of the app, for example "0.1.0". An empty string when Android does not tell. */
+internal fun appVersion(context: Context): String = runCatching {
+    context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
+}.getOrDefault("")

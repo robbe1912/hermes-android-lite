@@ -57,15 +57,18 @@ class TunnelController(context: Context) {
      * approves the device. Throws [TunnelException] when the node fails or the time is over.
      */
     suspend fun ensureRunning(timeoutMs: Long = APPROVAL_WAIT_MS) {
-        val started = lock.withLock {
+        val (startError, started) = lock.withLock {
             if (_state.value is TunnelState.Running) return
             _state.value = TunnelState.Starting
+            var startError: String? = null
             try {
                 call { tunnel.Tunnel.start(stateDir.absolutePath, hostname, "", "", false) }
             } catch (e: Exception) {
                 // The node can already run in this process. The status read below tells.
+                // The reason stays here for the case that the node did not start.
+                startError = e.message
             }
-            generation
+            startError to generation
         }
         val deadline = SystemClock.elapsedRealtime() + timeoutMs
         var loginAsked = false
@@ -88,7 +91,8 @@ class TunnelController(context: Context) {
                     if (generation == started) _state.value = current
                     throw TunnelException(current.message)
                 }
-                TunnelState.Stopped -> throw TunnelException("The tailnet node did not start.")
+                TunnelState.Stopped ->
+                    throw TunnelException(listOfNotNull("The tailnet node did not start.", startError).joinToString(" "))
                 TunnelState.Starting, is TunnelState.NeedsApproval ->
                     if (generation == started) _state.value = current
             }

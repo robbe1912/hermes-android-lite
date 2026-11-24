@@ -1,7 +1,6 @@
 package com.robbe1912.hermeslite.push
 
 import android.content.Context
-import android.content.pm.PackageManager
 import android.os.Build
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
@@ -10,6 +9,7 @@ import com.robbe1912.hermeslite.data.PushConfig
 import com.robbe1912.hermeslite.data.ServerConfig
 import com.robbe1912.hermeslite.data.Settings
 import com.robbe1912.hermeslite.gateway.GatewayApi
+import com.robbe1912.hermeslite.ui.appVersion
 import com.robbe1912.hermeslite.ui.userMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -121,14 +121,10 @@ class PushController(
                 put("token", token)
                 put("project_id", push.projectId)
                 put("device", "${Build.MANUFACTURER} ${Build.MODEL}")
-                put("app_version", versionName())
+                put("app_version", appVersion(context))
                 put("registered_at", Instant.now().toString())
             },
         )
         api.writeText("hermes-lite-push/${settings.installId.value}.json", body)
     }
-
-    private fun versionName(): String = runCatching {
-        context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
-    }.getOrDefault("")
 }

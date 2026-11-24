@@ -48,7 +48,7 @@ import kotlinx.coroutines.launch
  * that call works.
  */
 @Composable
-internal fun SetupScreen(modifier: Modifier, onSaved: () -> Unit, onError: (String) -> Unit) {
+internal fun SetupScreen(modifier: Modifier, scroll: Boolean = true, onSaved: () -> Unit, onError: (String) -> Unit) {
     val app = App.instance
     val scope = rememberCoroutineScope()
     val saved = app.settings.server.value ?: ServerConfig()
@@ -82,7 +82,7 @@ internal fun SetupScreen(modifier: Modifier, onSaved: () -> Unit, onError: (Stri
     }
 
     Column(
-        modifier = modifier.verticalScroll(rememberScrollState()).padding(16.dp),
+        modifier = (if (scroll) modifier.verticalScroll(rememberScrollState()) else modifier).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Heading("Gateway")
@@ -125,8 +125,8 @@ internal fun SettingsScreen(snackbar: SnackbarHostState, onDone: () -> Unit, onE
     val app = App.instance
     var confirm by remember { mutableStateOf(false) }
     ScreenScaffold(title = "Settings", snackbar = snackbar, onBack = onDone) { padding ->
-        Column(Modifier.padding(padding)) {
-            SetupScreen(Modifier.weight(1f), onSaved = onDone, onError = onError)
+        Column(Modifier.padding(padding).verticalScroll(rememberScrollState())) {
+            SetupScreen(Modifier.fillMaxWidth(), scroll = false, onSaved = onDone, onError = onError)
             HorizontalDivider()
             PushCard(onError)
             HorizontalDivider()
@@ -147,6 +147,7 @@ internal fun SettingsScreen(snackbar: SnackbarHostState, onDone: () -> Unit, onE
                     Text("Forget this gateway")
                 }
             }
+            AboutRow()
         }
     }
 }

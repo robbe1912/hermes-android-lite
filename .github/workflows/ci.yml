@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions: contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    name: No secrets in the history
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - run: sh .githooks/check-secrets.sh --all
+
+  tunnel:
+    name: Tunnel library
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tunnel
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: tunnel/go.mod
+      # The Android library uses this tag. It removes the log upload of Tailscale.
+      - run: go vet -tags ts_omit_logtail ./...
+      - run: go test ./...
+
+  relay:
+    name: Relay
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 -m unittest discover -s relay -p "test_*.py"
+
+  app:
+    name: App
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: tunnel/go.mod
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools platforms;android-37.1 build-tools;36.0.0 ndk;27.2.12479018
+      - name: gomobile
+        run: go install golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
+        working-directory: tunnel
+      - name: Add Go binaries to PATH
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - run: sh ./gradlew :app:testDebugUnitTest :app:assembleDebug --stacktrace
+
+  release:
+    name: Release
+    if: github.ref_type == 'tag'
+    needs: [secrets, tunnel, relay, app]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: tunnel/go.mod
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools platforms;android-37.1 build-tools;36.0.0 ndk;27.2.12479018
+      - name: gomobile
+        run: go install golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
+        working-directory: tunnel
+      - name: Add Go binaries to PATH
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Put the signing key outside the repository
+        env:
+          KEYSTORE: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: printf '%s' "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.keystore"
+      - name: Build the signed APK
+        env:
+          HERMES_LITE_KEYSTORE: ${{ runner.temp }}/release.keystore
+          HERMES_LITE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          HERMES_LITE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          HERMES_LITE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: sh ./gradlew :app:assembleRelease -PtunnelTargets=android/arm64 --stacktrace
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk "hermes-lite-${GITHUB_REF_NAME}.apk"
+          sha256sum "hermes-lite-${GITHUB_REF_NAME}.apk" > "hermes-lite-${GITHUB_REF_NAME}.sha256"
+          gh release create "$GITHUB_REF_NAME" "hermes-lite-${GITHUB_REF_NAME}.apk" "hermes-lite-${GITHUB_REF_NAME}.sha256" --generate-notes --title "$GITHUB_REF_NAME"

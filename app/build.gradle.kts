@@ -1,3 +1,24 @@
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
+
+/** Copies the NOTICE file of the repository into the assets of the app. */
+abstract class CopyNotices : DefaultTask() {
+    @get:InputFile
+    abstract val notice: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun run() {
+        outputDir.get().asFile.resolve("NOTICE").writeText(notice.get().asFile.readText())
+    }
+}
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -20,7 +41,12 @@ val buildTunnelAar = tasks.register<Exec>("buildTunnelAar") {
     doFirst {
         aar.parentFile.mkdirs()
     }
-    commandLine("gomobile", "bind", "-target=$targets", "-androidapi", "26", "-o", aar.absolutePath, ".")
+    commandLine(
+        "gomobile", "bind", "-target=$targets", "-androidapi", "26",
+        // No symbol tables in the library. They are not needed on a phone.
+        // No log upload: without the logtail feature, the library sends no debug logs to Tailscale.
+        "-ldflags=-s -w", "-tags=ts_omit_logtail", "-o", aar.absolutePath, ".",
+    )
 }
 
 android {
@@ -45,11 +71,23 @@ android {
         }
     }
 
+    signingConfigs {
+        // The key stays outside the repository. The owner and CI set these four variables.
+        // Without them, the release build makes an APK without a signature.
+        create("release") {
+            storeFile = System.getenv("HERMES_LITE_KEYSTORE")?.let { file(it) }
+            storePassword = System.getenv("HERMES_LITE_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("HERMES_LITE_KEY_ALIAS")
+            keyPassword = System.getenv("HERMES_LITE_KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
@@ -60,6 +98,18 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+// The NOTICE of the repository ships in the app as an asset. Settings shows it.
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(
+            tasks.register<CopyNotices>("${variant.name}CopyNotices") {
+                notice.set(rootProject.layout.projectDirectory.file("NOTICE"))
+            },
+            CopyNotices::outputDir,
+        )
     }
 }
 
