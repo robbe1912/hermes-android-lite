@@ -20,6 +20,10 @@ local.properties
 tunnel/go.work
 tunnel/go.work.sum
 
+# ---- Python ----
+__pycache__/
+*.pyc
+
 # ---- SECRETS: never commit. Hard rule. ----
 # Guard 1 is this list. Guard 2 is the hook in .githooks. Guard 3 is the CI scan.
 # A real file of one of these names stays OUTSIDE the repository directory.

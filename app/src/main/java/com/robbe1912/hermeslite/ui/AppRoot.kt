@@ -60,10 +60,10 @@ fun AppRoot() {
     val snackbar = remember { SnackbarHostState() }
     val navigator = remember { Navigator(Screen.Channels) }
 
-    // Counts the wake-ups. A wake-up refreshes the list. Push uses it in phase 4.
-    val wake = remember { MutableStateFlow(0) }
-    val wakeTick by wake.collectAsStateWithLifecycle()
-
+    // Counts the refreshes. A wake-up from a notification refreshes the lists.
+    val refresh = remember { MutableStateFlow(0) }
+    val refreshTick by refresh.collectAsStateWithLifecycle()
+    val target by app.wake.collectAsStateWithLifecycle()
     val config by app.settings.server.collectAsStateWithLifecycle()
     val setOn = config?.isSetUp == true
     val stack by navigator.stack.collectAsStateWithLifecycle()
@@ -90,6 +90,18 @@ fun AppRoot() {
         return
     }
 
+    // A notification opens a run. The app takes the target once, and then clears it.
+    LaunchedEffect(target) {
+        val run = target ?: return@LaunchedEffect
+        if (run.sessionId != null) {
+            navigator.replaceAll(Screen.Channels, Screen.Thread(run.sessionId, run.title))
+        } else {
+            navigator.replaceAll(Screen.Cron, Screen.CronRuns(run.jobId, run.title))
+        }
+        refresh.value++
+        app.wake.value = null
+    }
+
     // A tap on a tab of the bottom bar makes that root the only screen on the stack.
     fun openTab(tab: RootTab) {
         navigator.replaceAll(if (tab == RootTab.Channels) Screen.Channels else Screen.Cron)
@@ -98,7 +110,7 @@ fun AppRoot() {
     when (val screen = stack.last()) {
         Screen.Channels -> ChannelsScreen(
             snackbar = snackbar,
-            tick = wakeTick,
+            tick = refreshTick,
             onOpen = { navigator.push(Screen.Thread(it.id, it.title)) },
             onNew = { navigator.push(Screen.Thread(null, "")) },
             onSettings = { navigator.push(Screen.Settings) },
@@ -106,7 +118,7 @@ fun AppRoot() {
         )
         Screen.Cron -> CronScreen(
             snackbar = snackbar,
-            tick = wakeTick,
+            tick = refreshTick,
             onOpen = { navigator.push(Screen.CronRuns(it.id, it.name)) },
             onSettings = { navigator.push(Screen.Settings) },
             onTab = ::openTab,
@@ -115,7 +127,7 @@ fun AppRoot() {
             jobId = screen.jobId,
             title = screen.title,
             snackbar = snackbar,
-            tick = wakeTick,
+            tick = refreshTick,
             onBack = { navigator.pop() },
             onOpenThread = { navigator.push(Screen.Thread(it.id, it.title)) },
             onOpenReport = { navigator.push(Screen.Report(it.reportPath, screen.title)) },

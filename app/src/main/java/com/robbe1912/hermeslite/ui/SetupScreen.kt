@@ -128,6 +128,7 @@ internal fun SettingsScreen(snackbar: SnackbarHostState, onDone: () -> Unit, onE
         Column(Modifier.padding(padding)) {
             SetupScreen(Modifier.weight(1f), onSaved = onDone, onError = onError)
             HorizontalDivider()
+            PushCard(onError)
             if (confirm) {
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -203,12 +204,12 @@ private fun SignInButton(onError: (String) -> Unit) {
 }
 
 @Composable
-private fun Heading(text: String) {
+internal fun Heading(text: String) {
     Text(text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
 }
 
 @Composable
-private fun Hint(text: String) {
+internal fun Hint(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 

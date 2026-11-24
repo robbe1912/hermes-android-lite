@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Hermes Lite</string>
+    <string name="channel_cron">Cron runs</string>
+    <string name="run_ended">The cron run ended.</string>
+    <string name="run_failed">The cron run failed.</string>
 </resources>

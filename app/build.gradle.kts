@@ -78,6 +78,8 @@ dependencies {
     "implementation"("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     "implementation"("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
     "implementation"("com.squareup.okhttp3:okhttp:5.5.1")
+    // Push needs Firebase. The app starts it with the project of the user.
+    "implementation"("com.google.firebase:firebase-messaging:26.0.2")
     "debugImplementation"("androidx.compose.ui:ui-tooling")
     "testImplementation"("junit:junit:4.13.2")
 }
