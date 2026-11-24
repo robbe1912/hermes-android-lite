@@ -192,6 +192,11 @@ class GatewayApi(internal val settings: Settings, internal val tunnel: TunnelCon
         )
     }
 
+    /** Deletes one file below the gateway file root. [path] is relative to the root. */
+    suspend fun deleteFile(path: String) {
+        request("DELETE", "/api/files", body = buildJsonObject { put("path", path) })
+    }
+
     /** The URL of the gateway socket. The ticket in the URL is valid for 30 seconds and one use. */
     suspend fun webSocketUrl(): HttpUrl {
         val base = baseUrl()

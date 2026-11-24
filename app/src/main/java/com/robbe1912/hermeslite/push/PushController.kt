@@ -16,8 +16,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -53,7 +55,8 @@ class PushController(
     /** Firebase made a new token for this device. Register it again. */
     fun onNewToken(token: String) {
         scope.launch {
-            val push = settings.push.value
+            // Firebase can start the process. Then the stored values are not read yet.
+            val push = withTimeoutOrNull(LOAD_WAIT_MS) { settings.push.first { it != null } }
             val server = settings.server.value
             if (push == null || server == null || !push.isSetUp || !server.isSetUp) return@launch
             try {
@@ -65,6 +68,43 @@ class PushController(
             }
         }
     }
+
+    /**
+     * Turns push off. The gateway forgets this device, and Firebase forgets the token of this
+     * device. A step that fails does not stop the other step.
+     */
+    suspend fun turnOff() {
+        state.value = "Turning push off."
+        val server = settings.server.value
+        if (server != null && server.isSetUp) {
+            try {
+                api.deleteFile(deviceFile())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // The device file stays. Then the relay logs one failed send for each cron run.
+            }
+        }
+        if (FirebaseApp.getApps(context).isNotEmpty()) {
+            try {
+                deleteToken()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // The token stays. The app ignores the messages of Firebase while push is off.
+            }
+        }
+        settings.savePush(PushConfig())
+    }
+
+    /** Deletes the token of this device at Firebase. A failed attempt ends the wait too. */
+    private suspend fun deleteToken() = suspendCancellableCoroutine<Unit> { continuation ->
+        FirebaseMessaging.getInstance().deleteToken()
+            .addOnCompleteListener { if (continuation.isActive) continuation.resume(Unit) }
+    }
+
+    /** The device file of this install below hermes-lite-push. */
+    private fun deviceFile() = "hermes-lite-push/${settings.installId.value}.json"
 
     private suspend fun apply(push: PushConfig?, server: ServerConfig?) {
         if (push == null || server == null) return
@@ -125,6 +165,11 @@ class PushController(
                 put("registered_at", Instant.now().toString())
             },
         )
-        api.writeText("hermes-lite-push/${settings.installId.value}.json", body)
+        api.writeText(deviceFile(), body)
+    }
+
+    private companion object {
+        /** The wait for the stored values after a cold start of the process. */
+        const val LOAD_WAIT_MS = 5_000L
     }
 }

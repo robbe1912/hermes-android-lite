@@ -291,7 +291,10 @@ def ping(firebase, targets, job, status, session_id):
             LOG.info("Skip %s: it uses the Firebase project %s.", device.get("device"), device["project_id"])
             continue
         code = firebase.send(device["token"], data)
-        LOG.info("Sent the wake ping for job %s to %s: HTTP %s", job["id"], device.get("device"), code)
+        if code == 200:
+            LOG.info("Sent the wake ping for job %s to %s.", job["id"], device.get("device"))
+        else:
+            LOG.warning("The wake ping for job %s did not reach %s.", job["id"], device.get("device"))
 
 
 def main():

@@ -14,6 +14,9 @@ import com.google.firebase.messaging.RemoteMessage
 import com.robbe1912.hermeslite.App
 import com.robbe1912.hermeslite.MainActivity
 import com.robbe1912.hermeslite.R
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Gets the messages of Firebase.
@@ -28,6 +31,12 @@ class PushService : FirebaseMessagingService() {
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
+        val settings = App.instance.settings
+        // Firebase calls this method on a worker thread. The process can be new, and then the
+        // stored values are not read yet. Without the wait the intent gets an empty nonce, and
+        // the app does not open the run.
+        val push = runBlocking { withTimeoutOrNull(LOAD_WAIT_MS) { settings.push.first { it != null } } }
+        if (push?.isSetUp != true) return
         val data = message.data
         val jobId = data["job_id"]?.takeIf { it.isNotBlank() } ?: return
         val name = data["name"]?.takeIf { it.isNotBlank() } ?: jobId
@@ -37,7 +46,7 @@ class PushService : FirebaseMessagingService() {
         manager.createNotificationChannel(
             NotificationChannel(CHANNEL, getString(R.string.channel_cron), NotificationManager.IMPORTANCE_DEFAULT),
         )
-        val intent = WakeIntent.intent(this, App.instance.settings.installId.value, jobId, name, data["session_id"])
+        val intent = WakeIntent.intent(this, settings.installId.value, jobId, name, data["session_id"])
         val open = PendingIntent.getActivity(this, jobId.hashCode(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val notification = NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
@@ -53,6 +62,8 @@ class PushService : FirebaseMessagingService() {
 
     private companion object {
         const val CHANNEL = "cron_runs"
+        /** The wait for the stored values after a cold start of the process. */
+        const val LOAD_WAIT_MS = 5_000L
         val FAILED = setOf("failed", "error", "timeout")
     }
 }

@@ -40,7 +40,7 @@ Push needs a Firebase project of your own.
 3. On the gateway server, put the key at `/etc/hermes-lite-push/service-account.json` with the owner `root:hermes` and the mode `640`. Then run `sudo sh relay/install.sh` and `sudo systemctl enable --now hermes-lite-push`.
 4. In the app: Settings, Push, **Choose google-services.json**. The file stays on the device. The app reads four values from it and writes its push token into `<Hermes home>/hermes-lite-push/`.
 
-The relay reads the cron jobs of the gateway every 5 seconds. When a run ends, it sends one wake ping to each registered device. The notification opens the run. A tap on it needs a route to the gateway.
+The relay reads the cron jobs of the gateway every 5 seconds. When a run ends, it sends one wake ping to each registered device. The notification opens the run. A tap on it needs a route to the gateway. When you turn push off, the app deletes its device file at the gateway.
 
 `HERMES_LITE_DRY_RUN=1` makes the relay log each wake ping instead of sending it. All settings are variables with the prefix `HERMES_LITE_`. See the top of `relay/hermes_lite_relay.py`.
 

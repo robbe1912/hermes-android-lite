@@ -80,7 +80,7 @@ internal fun PushCard(onError: (String) -> Unit) {
                 Text(if (config?.isSetUp == true) "Replace the file" else "Choose google-services.json")
             }
             if (config?.isSetUp == true) {
-                TextButton(onClick = { scope.launch(Dispatchers.IO) { app.settings.savePush(PushConfig()) } }) {
+                TextButton(onClick = { scope.launch(Dispatchers.IO) { app.push.turnOff() } }) {
                     Text("Turn push off")
                 }
             }

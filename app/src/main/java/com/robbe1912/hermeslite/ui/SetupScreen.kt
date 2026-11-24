@@ -137,6 +137,7 @@ internal fun SettingsScreen(snackbar: SnackbarHostState, onDone: () -> Unit, onE
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     TextButton(onClick = { app.appScope.launch {
+                        if (app.settings.push.value?.isSetUp == true) app.push.turnOff()
                         app.api.reset()
                         app.settings.clear()
                     } }) { Text("Yes, forget it") }
