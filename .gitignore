@@ -1,0 +1,51 @@
+# ---- Gradle and Android build output ----
+.gradle/
+build/
+*/build/
+.kotlin/
+.idea/
+*.iml
+.navigation/
+captures/
+.externalNativeBuild/
+.cxx/
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# ---- Build artifact made from source: run the Gradle task, do not commit it ----
+app/libs/*.aar
+
+# ---- Go ----
+tunnel/go.work
+tunnel/go.work.sum
+
+# ---- SECRETS: never commit. Hard rule. ----
+# Guard 1 is this list. Guard 2 is the hook in .githooks. Guard 3 is the CI scan.
+# A real file of one of these names stays OUTSIDE the repository directory.
+google-services.json
+**/google-services.json
+*-firebase-adminsdk-*.json
+*service-account*.json
+*serviceaccount*.json
+push-token*.json
+keystore.properties
+key.properties
+signing.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+*.ppk
+.env
+.env.*
+*.env
+/secrets/
+**/secrets/
+/credentials/
+**/credentials/

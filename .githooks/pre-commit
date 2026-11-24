@@ -1,0 +1,4 @@
+#!/bin/sh
+# Runs before each commit. Stops the commit when a staged file is a secret.
+# Enable once per clone:  git config core.hooksPath .githooks
+exec "$(git rev-parse --show-toplevel)/.githooks/check-secrets.sh" --cached

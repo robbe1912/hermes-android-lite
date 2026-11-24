@@ -1,0 +1,16 @@
+#!/bin/sh
+# Runs before each push. Stops the push when a commit that is on no remote holds a secret.
+# Enable once per clone:  git config core.hooksPath .githooks
+set -u
+top="$(git rev-parse --show-toplevel)"
+status=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -n "$local_sha" ] || continue
+  # A branch deletion sends a zero SHA. Nothing to scan.
+  case "$local_sha" in
+    *[!0]*) ;;
+    *) continue ;;
+  esac
+  "$top/.githooks/check-secrets.sh" --range "$local_sha" || status=1
+done
+exit $status
