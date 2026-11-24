@@ -28,6 +28,15 @@ plugins {
 // Property tunnelTargets overrides the Android targets, for example:
 //   gradlew assembleRelease -PtunnelTargets=android/arm64
 val tunnelAar = layout.buildDirectory.file("tunnel/tunnel.aar")
+val tunnelTargets = providers.gradleProperty("tunnelTargets").orNull ?: "android/arm64,android/amd64"
+// The APK lists only the ABIs of the tunnel library. An ABI without the library starts the app and crashes it at the first use of the tunnel.
+val tunnelAbis = tunnelTargets.split(',').map { target ->
+    when (target.trim()) {
+        "android/arm64" -> "arm64-v8a"
+        "android/amd64" -> "x86_64"
+        else -> error("Unknown tunnel target: $target")
+    }
+}
 
 val buildTunnelAar = tasks.register<Exec>("buildTunnelAar") {
     group = "build"
@@ -36,7 +45,7 @@ val buildTunnelAar = tasks.register<Exec>("buildTunnelAar") {
     inputs.dir(tunnelDir)
     outputs.file(tunnelAar)
     workingDir(tunnelDir)
-    val targets = providers.gradleProperty("tunnelTargets").orNull ?: "android/arm64,android/amd64"
+    val targets = tunnelTargets
     val aar = tunnelAar.get().asFile
     doFirst {
         aar.parentFile.mkdirs()
@@ -63,11 +72,10 @@ android {
         applicationId = "com.robbe1912.hermeslite"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
-        // The tunnel library ships these two ABIs: phones and emulators.
+        versionCode = 2
+        versionName = "0.1.1"
         ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64")
+            abiFilters += tunnelAbis
         }
     }
 
