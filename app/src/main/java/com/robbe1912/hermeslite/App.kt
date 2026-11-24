@@ -9,6 +9,8 @@ import com.robbe1912.hermeslite.push.PushController
 import com.robbe1912.hermeslite.push.WakeIntent
 import com.robbe1912.hermeslite.tunnel.TunnelController
 import com.robbe1912.hermeslite.ui.Threads
+import com.robbe1912.hermeslite.voice.ReadAloud
+import com.robbe1912.hermeslite.voice.VoiceInput
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -26,8 +28,10 @@ class App : Application() {
     val tunnel by lazy { TunnelController(this) }
     val api by lazy { GatewayApi(settings, tunnel) }
     val socket by lazy { GatewaySocket(api) }
-    val threads by lazy { Threads(api, socket, appScope) }
+    val threads by lazy { Threads(api, socket, appScope, ::onAnswer) }
     val push by lazy { PushController(this, settings, api, appScope) }
+    val voice by lazy { VoiceInput(this) }
+    val readAloud by lazy { ReadAloud(this) }
 
     /** The run that a notification opens. The root screen takes it and sets it back to null. */
     val wake = MutableStateFlow<WakeIntent.Target?>(null)
@@ -40,6 +44,8 @@ class App : Application() {
         instance = this
         settings.loadAsync(appScope)
         push.start()
+        // The voice engine starts when the user turns read aloud on.
+        appScope.launch { settings.readAloud.collect { if (it) readAloud.prepare() } }
     }
 
     /**
@@ -52,6 +58,11 @@ class App : Application() {
             settings.installId.first { it.isNotBlank() }
             wake.value = WakeIntent.target(intent, settings.installId.value)
         }
+    }
+
+    /** Reads a finished answer aloud when the user turned the setting on. */
+    private fun onAnswer(text: String) {
+        if (settings.readAloud.value) readAloud.speak(text)
     }
 
     companion object {

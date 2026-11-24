@@ -7,6 +7,19 @@
     <!-- The notifications of ended cron runs. Android 13 and later ask the user for it. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- The voice button. Android asks the user for it. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- The voice engine and the speech recognizer of the device. Android 11 needs this list. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
     <application
         android:name=".App"
         android:allowBackup="false"

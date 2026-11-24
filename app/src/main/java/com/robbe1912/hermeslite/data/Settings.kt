@@ -108,6 +108,9 @@ class Settings(private val context: Context) {
     /** A random id of this install. It is "" until it is read. The gateway knows the device under it. */
     val installId = MutableStateFlow("")
 
+    /** true when the app reads answers aloud. The setting stays when the user forgets the gateway. */
+    val readAloud = MutableStateFlow(false)
+
     fun loadAsync(scope: CoroutineScope) {
         scope.launch {
             val stored = try {
@@ -117,6 +120,7 @@ class Settings(private val context: Context) {
                 null
             }
             installId.value = stored?.get(INSTALL_ID)?.takeIf { it.isNotBlank() } ?: newInstallId()
+            readAloud.value = stored?.get(READ_ALOUD) ?: false
             server.value = ServerConfig(
                 address = stored?.get(ADDRESS) ?: "",
                 https = stored?.get(HTTPS) ?: false,
@@ -158,9 +162,18 @@ class Settings(private val context: Context) {
         push.value = config
     }
 
+    /** Stores the read aloud setting. */
+    suspend fun saveReadAloud(on: Boolean) {
+        context.store.edit { stored -> stored[READ_ALOUD] = on }
+        readAloud.value = on
+    }
+
     /** Forgets the gateway and the Firebase project. The app shows the setup screen again. */
     suspend fun clear() {
-        context.store.edit { stored -> stored.clear() }
+        context.store.edit { stored ->
+            stored.clear()
+            stored[READ_ALOUD] = readAloud.value
+        }
         server.value = ServerConfig()
         push.value = PushConfig()
         installId.value = newInstallId()
@@ -185,5 +198,6 @@ class Settings(private val context: Context) {
         val PUSH_APP_ID = stringPreferencesKey("push_app_id")
         val PUSH_SENDER = stringPreferencesKey("push_sender_id")
         val INSTALL_ID = stringPreferencesKey("install_id")
+        val READ_ALOUD = booleanPreferencesKey("read_aloud")
     }
 }

@@ -1,5 +1,9 @@
 package com.robbe1912.hermeslite.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,6 +36,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -44,10 +49,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.core.content.ContextCompat
+import com.robbe1912.hermeslite.App
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -65,6 +73,32 @@ internal fun ThreadScreen(
     val loading by model.loading.collectAsStateWithLifecycle()
     val text by model.input.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+
+    // The voice button: the microphone permission, the words, and the turn of the recognizer.
+    val app = App.instance
+    val context = LocalContext.current
+    val listening by app.voice.listening.collectAsStateWithLifecycle()
+    val heard by app.voice.text.collectAsStateWithLifecycle()
+    val voiceError by app.voice.error.collectAsStateWithLifecycle()
+    val mic = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) app.voice.start()
+    }
+    LaunchedEffect(voiceError) {
+        val message = voiceError ?: return@LaunchedEffect
+        snackbar.showSnackbar(message)
+        // Clear the message after the snackbar. Before that, the new key ends the snackbar.
+        app.voice.error.value = null
+    }
+    LaunchedEffect(listening) {
+        // A turn that ended with words puts them in the composer.
+        if (!listening && heard.isNotBlank()) {
+            app.voice.text.value = ""
+            model.input.value = listOf(model.input.value.trim(), heard).filter { it.isNotBlank() }.joinToString(" ")
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose { app.voice.cancel() }
+    }
 
     // The list follows the stream while the user is at the end.
     var follow by remember { mutableStateOf(true) }
@@ -109,6 +143,17 @@ internal fun ThreadScreen(
                 onText = { model.input.value = it },
                 streaming = state.streaming,
                 enabled = !showPending,
+                listening = listening,
+                heard = heard,
+                onVoice = {
+                    when {
+                        app.voice.listening.value -> app.voice.finish()
+                        !app.voice.available -> app.voice.start()
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                            PackageManager.PERMISSION_GRANTED -> app.voice.start()
+                        else -> mic.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                },
                 onSend = { model.send(onCreated) },
                 onStop = model::stop,
             )
@@ -323,27 +368,44 @@ private fun Composer(
     onText: (String) -> Unit,
     streaming: Boolean,
     enabled: Boolean,
+    listening: Boolean,
+    heard: String,
+    onVoice: () -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit,
 ) {
-    Row(
-        Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(horizontal = 8.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.Bottom,
-    ) {
-        OutlinedTextField(
-            value = text,
-            onValueChange = onText,
-            modifier = Modifier.weight(1f),
-            placeholder = { Text("Message") },
-            maxLines = 6,
-            enabled = enabled,
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-        )
-        if (streaming) {
-            TextButton(onClick = onStop) { Text("Stop") }
-        } else {
-            IconButton(onClick = onSend, enabled = enabled && text.isNotBlank()) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+    Column(Modifier.fillMaxWidth().navigationBarsPadding().imePadding()) {
+        if (listening) {
+            // The words that the recognizer heard until now.
+            Text(
+                heard.ifBlank { "Listening" },
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            if (!streaming) {
+                TextButton(onClick = onVoice, enabled = enabled) { Text(if (listening) "Done" else "Voice") }
+            }
+            OutlinedTextField(
+                value = text,
+                onValueChange = onText,
+                modifier = Modifier.weight(1f),
+                placeholder = { Text("Message") },
+                maxLines = 6,
+                enabled = enabled,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+            )
+            if (streaming) {
+                TextButton(onClick = onStop) { Text("Stop") }
+            } else {
+                IconButton(onClick = onSend, enabled = enabled && text.isNotBlank()) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+                }
             }
         }
     }

@@ -129,6 +129,8 @@ internal fun SettingsScreen(snackbar: SnackbarHostState, onDone: () -> Unit, onE
             SetupScreen(Modifier.weight(1f), onSaved = onDone, onError = onError)
             HorizontalDivider()
             PushCard(onError)
+            HorizontalDivider()
+            VoiceCard()
             if (confirm) {
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),

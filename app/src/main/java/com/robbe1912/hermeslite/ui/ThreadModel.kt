@@ -23,7 +23,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /** The thread models of the app, one for each stored thread. */
-class Threads(private val api: GatewayApi, private val socket: GatewaySocket, private val scope: CoroutineScope) {
+class Threads(private val api: GatewayApi, private val socket: GatewaySocket, private val scope: CoroutineScope, private val onAnswer: (String) -> Unit = {}) {
     private val models = mutableMapOf<String, ThreadModel>()
 
     /** The key of a thread that has no stored id yet. */
@@ -31,7 +31,7 @@ class Threads(private val api: GatewayApi, private val socket: GatewaySocket, pr
 
     @Synchronized
     fun get(storedId: String?): ThreadModel =
-        models.getOrPut(storedId ?: newKey) { ThreadModel(storedId, api, socket, scope) }
+        models.getOrPut(storedId ?: newKey) { ThreadModel(storedId, api, socket, scope, onAnswer) }
 
     /** Moves the model of a new thread to the key of its stored id. */
     @Synchronized
@@ -47,7 +47,7 @@ class Threads(private val api: GatewayApi, private val socket: GatewaySocket, pr
  * The model lives in the app scope. It follows the gateway events also when the screen is closed,
  * so an open thread is current when the user comes back.
  */
-class ThreadModel(val storedId: String?, private val api: GatewayApi, private val socket: GatewaySocket, private val scope: CoroutineScope) {
+class ThreadModel(val storedId: String?, private val api: GatewayApi, private val socket: GatewaySocket, private val scope: CoroutineScope, private val onAnswer: (String) -> Unit) {
     val state = MutableStateFlow(ThreadState())
     val loading = MutableStateFlow(false)
 
@@ -210,6 +210,10 @@ class ThreadModel(val storedId: String?, private val api: GatewayApi, private va
         val runtime = runtimeId ?: return
         if (event.sessionId != runtime) return
         state.update { it.event(event.type, event.seq, event.payload) }
+        // A finished answer goes to the voice of the device when the user turned it on.
+        if (event.type == "message.complete") {
+            event.payload.str("text")?.takeIf { it.isNotBlank() }?.let(onAnswer)
+        }
     }
 
     private fun onRequest(request: ServerRequest) {
