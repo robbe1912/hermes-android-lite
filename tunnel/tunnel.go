@@ -209,6 +209,8 @@ func fillStatus(st *nodeStatus, ps *ipnstate.Status) {
 		st.DNSName = ps.Self.DNSName
 	}
 	switch ps.BackendState {
+	case "NoState", "Starting":
+		st.State = "starting"
 	case "Running":
 		st.State = "running"
 	case "NeedsLogin":
@@ -219,10 +221,8 @@ func fillStatus(st *nodeStatus, ps *ipnstate.Status) {
 		}
 	case "NeedsMachineAuth":
 		st.State = "needsApproval"
-	case "Starting":
-		st.State = "starting"
 	default:
-		// NoState, Stopped, and states that this code does not know.
+		// Stopped and states that this code does not know.
 		st.State = "stopped"
 	}
 }

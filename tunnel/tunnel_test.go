@@ -272,7 +272,7 @@ func TestFillStatusStates(t *testing.T) {
 		{"needs approval", "NeedsLogin", "https://example.invalid/a/x", "needsApproval"},
 		{"needs machine auth", "NeedsMachineAuth", "", "needsApproval"},
 		{"starting", "Starting", "", "starting"},
-		{"no state", "NoState", "", "stopped"},
+		{"no state", "NoState", "", "starting"},
 		{"stopped", "Stopped", "", "stopped"},
 		{"unknown state", "Paused", "", "stopped"},
 	}
