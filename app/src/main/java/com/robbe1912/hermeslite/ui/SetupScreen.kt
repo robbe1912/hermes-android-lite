@@ -48,7 +48,13 @@ import kotlinx.coroutines.launch
  * that call works.
  */
 @Composable
-internal fun SetupScreen(modifier: Modifier, scroll: Boolean = true, onSaved: () -> Unit, onError: (String) -> Unit) {
+internal fun SetupScreen(
+    modifier: Modifier,
+    scroll: Boolean = true,
+    showGatewayHeading: Boolean = true,
+    onSaved: () -> Unit,
+    onError: (String) -> Unit,
+) {
     val app = App.instance
     val scope = rememberCoroutineScope()
     val saved = app.settings.server.value ?: ServerConfig()
@@ -85,7 +91,7 @@ internal fun SetupScreen(modifier: Modifier, scroll: Boolean = true, onSaved: ()
         modifier = (if (scroll) modifier.verticalScroll(rememberScrollState()) else modifier).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Heading("Gateway")
+        if (showGatewayHeading) Heading("Gateway")
         Field("Address (host:port)", address, { address = it })
         SwitchRow("Use HTTPS", https) { https = it }
 
@@ -126,11 +132,16 @@ internal fun SettingsScreen(snackbar: SnackbarHostState, onDone: () -> Unit, onE
     var confirm by remember { mutableStateOf(false) }
     ScreenScaffold(title = "Settings", snackbar = snackbar, onBack = onDone) { padding ->
         Column(Modifier.padding(padding).verticalScroll(rememberScrollState())) {
-            SetupScreen(Modifier.fillMaxWidth(), scroll = false, onSaved = onDone, onError = onError)
-            HorizontalDivider()
-            PushCard(onError)
-            HorizontalDivider()
-            VoiceCard()
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Heading("Gateway")
+            }
+            SetupScreen(
+                Modifier.fillMaxWidth(),
+                scroll = false,
+                showGatewayHeading = false,
+                onSaved = onDone,
+                onError = onError,
+            )
             if (confirm) {
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -147,6 +158,23 @@ internal fun SettingsScreen(snackbar: SnackbarHostState, onDone: () -> Unit, onE
                 TextButton(onClick = { confirm = true }, modifier = Modifier.padding(horizontal = 8.dp)) {
                     Text("Forget this gateway")
                 }
+            }
+
+            HorizontalDivider()
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Heading("Notifications")
+            }
+            PushCard(onError)
+
+            HorizontalDivider()
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Heading("Voice")
+            }
+            VoiceCard()
+
+            HorizontalDivider()
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Heading("About")
             }
             AboutRow()
         }

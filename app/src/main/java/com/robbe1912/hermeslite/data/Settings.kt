@@ -110,6 +110,8 @@ class Settings(private val context: Context) {
 
     /** true when the app reads answers aloud. The setting stays when the user forgets the gateway. */
     val readAloud = MutableStateFlow(false)
+    /** null uses the device's default text-to-speech voice. */
+    val ttsVoice = MutableStateFlow<String?>(null)
 
     fun loadAsync(scope: CoroutineScope) {
         scope.launch {
@@ -121,6 +123,7 @@ class Settings(private val context: Context) {
             }
             installId.value = stored?.get(INSTALL_ID)?.takeIf { it.isNotBlank() } ?: newInstallId()
             readAloud.value = stored?.get(READ_ALOUD) ?: false
+            ttsVoice.value = stored?.get(TTS_VOICE)
             server.value = ServerConfig(
                 address = stored?.get(ADDRESS) ?: "",
                 https = stored?.get(HTTPS) ?: false,
@@ -168,11 +171,21 @@ class Settings(private val context: Context) {
         readAloud.value = on
     }
 
+    /** Stores the device text-to-speech voice name. Null restores the device default. */
+    suspend fun saveTtsVoice(name: String?) {
+        context.store.edit { stored ->
+            if (name == null) stored.remove(TTS_VOICE) else stored[TTS_VOICE] = name
+        }
+        ttsVoice.value = name
+    }
+
     /** Forgets the gateway and the Firebase project. The app shows the setup screen again. */
     suspend fun clear() {
         context.store.edit { stored ->
+            val voice = stored[TTS_VOICE]
             stored.clear()
             stored[READ_ALOUD] = readAloud.value
+            voice?.let { stored[TTS_VOICE] = it }
         }
         server.value = ServerConfig()
         push.value = PushConfig()
@@ -199,5 +212,6 @@ class Settings(private val context: Context) {
         val PUSH_SENDER = stringPreferencesKey("push_sender_id")
         val INSTALL_ID = stringPreferencesKey("install_id")
         val READ_ALOUD = booleanPreferencesKey("read_aloud")
+        val TTS_VOICE = stringPreferencesKey("tts_voice")
     }
 }

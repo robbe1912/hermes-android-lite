@@ -2,6 +2,7 @@ package com.robbe1912.hermeslite.voice
 
 import android.content.Context
 import android.speech.tts.TextToSpeech
+import android.speech.tts.Voice
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +20,12 @@ class ReadAloud(context: Context) {
     private var engine: TextToSpeech? = null
     private var ready = false
     private var pending: String? = null
+    private var selectedVoiceName: String? = null
+
+    /** English voices that the device's current text-to-speech engine provides. */
+    val voices = MutableStateFlow<List<Voice>>(emptyList())
+    val voicesLoaded = MutableStateFlow(false)
+    val voiceEngineError = MutableStateFlow<String?>(null)
 
     /** true from [speak] until the engine ends the answer. */
     val speaking = MutableStateFlow(false)
@@ -28,6 +35,14 @@ class ReadAloud(context: Context) {
         synchronized(lock) {
             if (engine != null) return
             engine = TextToSpeech(appContext) { status -> appContext.mainExecutor.execute { onInit(status) } }
+        }
+    }
+
+    /** Applies the selected English voice, or the device default when [name] is null. */
+    fun selectVoice(name: String?) {
+        synchronized(lock) {
+            selectedVoiceName = name
+            if (ready) applyVoice()
         }
     }
 
@@ -42,10 +57,14 @@ class ReadAloud(context: Context) {
                 speaking.value = true
                 Log.i("HermesLite", "Reads ${clean.length} characters aloud")
             } else {
-                // The engine reports soon. The text waits for it.
                 pending = clean
             }
         }
+    }
+
+    /** Speaks a short sample with the selected voice. */
+    fun preview() {
+        speak("Hello. This is a sample of the selected voice.")
     }
 
     /** Ends the answer now. A text that waits for the engine is dropped. */
@@ -61,11 +80,23 @@ class ReadAloud(context: Context) {
     private fun onInit(status: Int) {
         synchronized(lock) {
             ready = status == TextToSpeech.SUCCESS
+            voicesLoaded.value = true
             if (!ready) {
+                voiceEngineError.value = "The device text-to-speech engine did not start."
                 Log.w("HermesLite", "The voice engine of the device did not start (status $status).")
                 return
             }
+            voiceEngineError.value = null
             engine?.language = Locale.getDefault()
+            voices.value = engine?.voices.orEmpty()
+                .filter { it.locale.language == Locale.ENGLISH.language }
+                .sortedWith(
+                    compareByDescending<Voice> { it.quality }
+                        .thenBy { it.isNetworkConnectionRequired }
+                        .thenBy { it.locale.getDisplayName(Locale.ENGLISH) }
+                        .thenBy { it.name },
+                )
+            applyVoice()
             engine?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) = Unit
                 override fun onDone(utteranceId: String?) {
@@ -80,6 +111,13 @@ class ReadAloud(context: Context) {
             pending?.let { speak(it) }
             pending = null
         }
+    }
+
+    private fun applyVoice() {
+        val tts = engine ?: return
+        val selected = selectedVoiceName?.let { name -> voices.value.firstOrNull { it.name == name } }
+        if (selected != null && tts.setVoice(selected) == TextToSpeech.SUCCESS) return
+        tts.language = Locale.getDefault()
     }
 }
 

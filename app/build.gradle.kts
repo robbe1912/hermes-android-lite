@@ -128,6 +128,7 @@ dependencies {
     "implementation"("androidx.compose.material3:material3")
     // Material3 no longer brings the base icons. The app needs them for its bars and buttons.
     "implementation"("androidx.compose.material:material-icons-core")
+    "implementation"("androidx.compose.material:material-icons-extended")
     "implementation"("androidx.compose.ui:ui-tooling-preview")
     "implementation"("androidx.activity:activity-compose:1.13.0")
     "implementation"("androidx.lifecycle:lifecycle-runtime-compose:2.11.1")

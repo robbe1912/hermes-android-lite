@@ -26,12 +26,15 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -60,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.content.ContextCompat
 import com.robbe1912.hermeslite.App
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -84,6 +88,7 @@ internal fun ThreadScreen(
 
     // The voice button: the microphone permission, the words, and the turn of the recognizer.
     val app = App.instance
+    val voiceOutput by app.settings.readAloud.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val listening by app.voice.listening.collectAsStateWithLifecycle()
     val heard by app.voice.text.collectAsStateWithLifecycle()
@@ -160,6 +165,8 @@ internal fun ThreadScreen(
                 onText = { model.input.value = it },
                 streaming = state.streaming,
                 enabled = !showPending,
+                voiceOutput = voiceOutput,
+                onVoiceOutput = { enabled -> app.appScope.launch { app.settings.saveReadAloud(enabled) } },
                 listening = listening,
                 heard = heard,
                 onVoice = {
@@ -533,6 +540,8 @@ private fun Composer(
     enabled: Boolean,
     listening: Boolean,
     heard: String,
+    voiceOutput: Boolean,
+    onVoiceOutput: (Boolean) -> Unit,
     onVoice: () -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit,
@@ -552,7 +561,13 @@ private fun Composer(
             verticalAlignment = Alignment.Bottom,
         ) {
             if (!streaming) {
-                TextButton(onClick = onVoice, enabled = enabled) { Text(if (listening) "Done" else "Voice") }
+                IconButton(onClick = onVoice, enabled = enabled) {
+                    Icon(
+                        Icons.Default.Mic,
+                        contentDescription = if (listening) "Finish voice input" else "Start voice input",
+                        tint = if (listening) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             OutlinedTextField(
                 value = text,
@@ -563,6 +578,13 @@ private fun Composer(
                 enabled = enabled,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             )
+            IconToggleButton(checked = voiceOutput, onCheckedChange = onVoiceOutput) {
+                Icon(
+                    Icons.Default.RecordVoiceOver,
+                    contentDescription = if (voiceOutput) "Turn off voice output" else "Turn on voice output",
+                    tint = if (voiceOutput) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             if (streaming) {
                 TextButton(onClick = onStop) { Text("Stop") }
             } else {

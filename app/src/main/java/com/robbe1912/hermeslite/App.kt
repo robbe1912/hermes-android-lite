@@ -44,8 +44,9 @@ class App : Application() {
         instance = this
         settings.loadAsync(appScope)
         push.start()
-        // The voice engine starts when the user turns read aloud on.
+        // Voice settings loads the installed voices. The output switch also starts the engine.
         appScope.launch { settings.readAloud.collect { if (it) readAloud.prepare() } }
+        appScope.launch { settings.ttsVoice.collect { readAloud.selectVoice(it) } }
     }
 
     /**

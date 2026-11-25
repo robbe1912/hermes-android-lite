@@ -67,7 +67,6 @@ internal fun PushCard(onError: (String) -> Unit) {
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Heading("Push")
         Hint("The gateway tells this device when a cron run ends. It needs your Firebase project.")
         Hint("Pick the google-services.json of the Android app in that project. The file stays on this device.")
         Text(state, style = MaterialTheme.typography.bodyMedium)
