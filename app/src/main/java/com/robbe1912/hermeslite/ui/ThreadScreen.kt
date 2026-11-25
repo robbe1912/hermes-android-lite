@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -19,12 +20,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -52,6 +55,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.content.ContextCompat
@@ -72,6 +76,10 @@ internal fun ThreadScreen(
     val state by model.state.collectAsStateWithLifecycle()
     val loading by model.loading.collectAsStateWithLifecycle()
     val text by model.input.collectAsStateWithLifecycle()
+    val modelChoices by model.availableModels.collectAsStateWithLifecycle()
+    val selectedModel by model.selectedModel.collectAsStateWithLifecycle()
+    val modelsLoading by model.modelsLoading.collectAsStateWithLifecycle()
+    val modelError by model.modelError.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
     // The voice button: the microphone permission, the words, and the turn of the recognizer.
@@ -138,6 +146,15 @@ internal fun ThreadScreen(
                 if (showThinking) item { ThinkingRow(state.thinking.ifBlank { "Working" }) }
                 if (showPending) item { PendingCard(state.pending!!, model) }
             }
+            ModelPicker(
+                choices = modelChoices,
+                selected = selectedModel,
+                loading = modelsLoading,
+                error = modelError,
+                enabled = !state.streaming && !showPending,
+                onSelect = model::selectModel,
+                onRefresh = model::refreshModels,
+            )
             Composer(
                 text = text,
                 onText = { model.input.value = it },
@@ -358,6 +375,102 @@ private fun ClarifyForm(pending: PendingRequest.Clarify, model: ThreadModel) {
             }
             TextButton(onClick = model::decline) { Text("Skip") }
         }
+    }
+}
+
+@Composable
+private fun ModelPicker(
+    choices: List<ThreadModelOption>,
+    selected: ThreadModelOption?,
+    loading: Boolean,
+    error: String?,
+    enabled: Boolean,
+    onSelect: (ThreadModelOption) -> Unit,
+    onRefresh: () -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    val filtered = choices.filter {
+        it.model.contains(query, ignoreCase = true) ||
+            it.providerName.contains(query, ignoreCase = true) ||
+            it.provider.contains(query, ignoreCase = true)
+    }
+    TextButton(
+        onClick = { open = true },
+        enabled = enabled && !loading,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+    ) {
+        Text(
+            selected?.let { "Model: ${it.providerName} · ${it.model}" }
+                ?: if (loading) "Loading models…" else "Choose model",
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+    if (error != null) {
+        Text(
+            error,
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+    if (open) {
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text("Choose model") },
+            text = {
+                Column(Modifier.heightIn(max = 480.dp)) {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Search models") },
+                        singleLine = true,
+                    )
+                    if (error != null) {
+                        Text(
+                            error,
+                            Modifier.padding(top = 8.dp),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        TextButton(onClick = onRefresh, enabled = !loading) { Text("Retry") }
+                    }
+                    LazyColumn(Modifier.weight(1f, fill = false)) {
+                        items(filtered, key = { "${it.provider}:${it.model}" }) { option ->
+                            TextButton(
+                                onClick = {
+                                    onSelect(option)
+                                    open = false
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(option.model, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(
+                                            option.providerName,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    if (option == selected) Text("Selected", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { open = false }) { Text("Close") }
+            },
+        )
     }
 }
 

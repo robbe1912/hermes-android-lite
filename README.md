@@ -7,6 +7,7 @@ Unofficial community project. Not affiliated with Nous Research, Tailscale or Go
 ## What it does
 
 - Chat with your Hermes agent: channels, threads, streaming replies.
+- Choose a gateway-configured model for each thread and keep its conversation history.
 - Answer the questions and the approval requests of the agent in the thread.
 - Open each cron run as a thread and reply in it. Read the report of a script run.
 - Get a push notification when a cron run ends.
