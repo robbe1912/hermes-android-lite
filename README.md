@@ -36,7 +36,7 @@ The app writes one small file into the Hermes home when you turn push on. The re
 Push needs a Firebase project of your own.
 
 1. In the [Firebase console](https://console.firebase.google.com): make a project. Add an Android app with the package name `com.robbe1912.hermeslite`. Download `google-services.json`.
-2. In the project: IAM and administration, Service accounts. Make a service account with the role **Firebase Cloud Messaging API Admin**. Make a JSON key for it.
+2. In the same project, open **IAM and administration → Service accounts**. Create a service account and grant it the role **Firebase Cloud Messaging API Admin**. Make a JSON key for it. The project ID in this key must match the project ID in `google-services.json`.
 3. On the gateway server, put the key at `/etc/hermes-lite-push/service-account.json` with the owner `root:hermes` and the mode `640`. Then run `sudo sh relay/install.sh` and `sudo systemctl enable --now hermes-lite-push`.
 4. In the app: Settings, Push, **Choose google-services.json**. The file stays on the device. The app reads four values from it and writes its push token into `<Hermes home>/hermes-lite-push/`.
 

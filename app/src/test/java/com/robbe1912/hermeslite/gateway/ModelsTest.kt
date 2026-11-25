@@ -44,12 +44,10 @@ class PushConfigTest {
         {
           "project_info": {"project_number": "123456789", "project_id": "home-7f3a0", "project_name": "home"},
           "client": [
-            {"client_info": {"mobile_client_info": "com.example.other"},
-             "api_key": [{"current_key": "AIzaOTHER"}], "mobilesdk_app_id": "1:1:ios:other"},
-            {"client_info": {"android_client_info": {"package_name": "com.example.other"}},
-             "api_key": [{"current_key": "AIzaOTHER"}], "mobilesdk_app_id": "1:1:android:other"},
-            {"client_info": {"android_client_info": {"package_name": "com.robbe1912.hermeslite"}},
-             "api_key": [{"current_key": "AIzaMINE"}], "mobilesdk_app_id": "1:123456789:android:abc"}
+            {"client_info": {"android_client_info": {"package_name": "com.example.other"}, "mobilesdk_app_id": "1:1:android:other"},
+             "api_key": [{"current_key": "AIzaOTHER"}]},
+            {"client_info": {"android_client_info": {"package_name": "com.robbe1912.hermeslite"}, "mobilesdk_app_id": "1:123456789:android:abc"},
+             "api_key": [{"current_key": "AIzaMINE"}]}
           ]
         }
     """.trimIndent()

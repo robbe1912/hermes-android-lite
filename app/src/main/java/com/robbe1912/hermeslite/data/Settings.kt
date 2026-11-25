@@ -79,7 +79,7 @@ data class PushConfig(
             val config = PushConfig(
                 projectId = info.value("project_id"),
                 apiKey = (client.arr("api_key")?.firstOrNull() as? JsonObject)?.value("current_key") ?: "",
-                appId = client.value("mobilesdk_app_id"),
+                appId = client.obj("client_info")?.value("mobilesdk_app_id") ?: "",
                 senderId = info.value("project_number"),
             )
             return config.takeIf { it.isSetUp }
