@@ -144,7 +144,6 @@ class Firebase:
     def __init__(self, service_account_path):
         with open(service_account_path, encoding="utf-8") as handle:
             account = json.load(handle)
-        self.project_id = account["project_id"]
         self._email = account["client_email"]
         self._key = account["private_key"]
         self._token = ""
@@ -176,11 +175,11 @@ class Firebase:
         self._token_until = now + int(answer.get("expires_in", 3600))
         return self._token
 
-    def send(self, device_token, data):
+    def send(self, device_token, data, target_project_id):
         """Sends one data message. Returns the HTTP status of Firebase."""
         message = {"message": {"token": device_token, "data": data, "android": {"priority": "HIGH"}}}
         request = urllib.request.Request(
-            "https://fcm.googleapis.com/v1/projects/%s/messages:send" % self.project_id,
+            "https://fcm.googleapis.com/v1/projects/%s/messages:send" % target_project_id,
             data=json.dumps(message).encode(),
             method="POST",
             headers={
@@ -287,10 +286,7 @@ def ping(firebase, targets, job, status, session_id):
     if session_id:
         data["session_id"] = session_id
     for device in targets:
-        if device["project_id"] != firebase.project_id:
-            LOG.info("Skip %s: it uses the Firebase project %s.", device.get("device"), device["project_id"])
-            continue
-        code = firebase.send(device["token"], data)
+        code = firebase.send(device["token"], data, device["project_id"])
         if code == 200:
             LOG.info("Sent the wake ping for job %s to %s.", job["id"], device.get("device"))
         else:

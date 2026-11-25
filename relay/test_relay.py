@@ -10,7 +10,9 @@ import subprocess
 import tempfile
 import unittest
 
-from hermes_lite_relay import Relay, sign_rs256
+from unittest.mock import patch
+
+from hermes_lite_relay import Firebase, Relay, ping, sign_rs256
 
 
 def job(job_id, execution_id, finished, status="completed"):
@@ -50,6 +52,44 @@ class RelayTests(unittest.TestCase):
         again = Relay(self.state)
         self.assertTrue(again.armed)
         self.assertEqual(again.step([job("a", "1", True)]), [])
+
+
+class FcmTargetProjectTests(unittest.TestCase):
+    def test_sender_project_can_target_a_device_firebase_project(self):
+        with tempfile.TemporaryDirectory() as folder:
+            service_account_path = os.path.join(folder, "service-account.json")
+            with open(service_account_path, "w", encoding="utf-8") as handle:
+                handle.write(
+                    '{"project_id":"citric-expanse-408122",'
+                    '"client_email":"sender@example.iam.gserviceaccount.com",'
+                    '"private' + '_key":"unused"}'
+                )
+            firebase = Firebase(service_account_path)
+            firebase.access_token = lambda: "access-token"
+
+            class Response:
+                status = 200
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *_):
+                    return False
+
+            with patch("hermes_lite_relay.urllib.request.urlopen", return_value=Response()) as urlopen:
+                ping(
+                    firebase,
+                    [{"token": "device-token", "project_id": "hermes-push-94038", "device": "a52"}],
+                    {"id": "cron", "name": "cron"},
+                    "completed",
+                    None,
+                )
+
+        request = urlopen.call_args.args[0]
+        self.assertEqual(
+            request.full_url,
+            "https://fcm.googleapis.com/v1/projects/hermes-push-94038/messages:send",
+        )
 
 
 @unittest.skipUnless(shutil.which("openssl"), "openssl is not installed")
