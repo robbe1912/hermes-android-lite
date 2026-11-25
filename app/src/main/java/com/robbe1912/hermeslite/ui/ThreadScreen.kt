@@ -390,13 +390,29 @@ private fun ModelPicker(
 ) {
     var open by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
-    val filtered = choices.filter {
-        it.model.contains(query, ignoreCase = true) ||
-            it.providerName.contains(query, ignoreCase = true) ||
-            it.provider.contains(query, ignoreCase = true)
+    var activeProvider by remember { mutableStateOf<String?>(null) }
+    val providers = choices.distinctBy { it.provider }.filter { provider ->
+        query.isBlank() ||
+            provider.providerName.contains(query, ignoreCase = true) ||
+            provider.provider.contains(query, ignoreCase = true) ||
+            choices.any { it.provider == provider.provider && it.model.contains(query, ignoreCase = true) }
+    }
+    val provider = providers.firstOrNull { it.provider == activeProvider } ?: providers.firstOrNull()
+    val providerMatchesQuery = provider != null && (
+        query.isBlank() ||
+            provider.providerName.contains(query, ignoreCase = true) ||
+            provider.provider.contains(query, ignoreCase = true)
+        )
+    val models = choices.filter {
+        it.provider == provider?.provider &&
+            (query.isBlank() || providerMatchesQuery || it.model.contains(query, ignoreCase = true))
     }
     TextButton(
-        onClick = { open = true },
+        onClick = {
+            query = ""
+            activeProvider = selected?.provider ?: choices.firstOrNull()?.provider
+            open = true
+        },
         enabled = enabled && !loading,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
@@ -426,7 +442,7 @@ private fun ModelPicker(
                         value = query,
                         onValueChange = { query = it },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Search models") },
+                        label = { Text("Search providers and models") },
                         singleLine = true,
                     )
                     if (error != null) {
@@ -438,32 +454,66 @@ private fun ModelPicker(
                         )
                         TextButton(onClick = onRefresh, enabled = !loading) { Text("Retry") }
                     }
-                    LazyColumn(Modifier.weight(1f, fill = false)) {
-                        items(filtered, key = { "${it.provider}:${it.model}" }) { option ->
-                            TextButton(
-                                onClick = {
-                                    onSelect(option)
-                                    open = false
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Row(
-                                    Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Column(Modifier.weight(1f)) {
-                                        Text(option.model, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text(
-                                            option.providerName,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                    if (option == selected) Text("Selected", style = MaterialTheme.typography.labelSmall)
+                    Row(
+                        Modifier.weight(1f, fill = false).fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Column(Modifier.weight(0.4f)) {
+                            Text("Provider", style = MaterialTheme.typography.labelMedium)
+                            LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+                                items(providers, key = { it.provider }) { option ->
+                                    FilterChip(
+                                        selected = option.provider == provider?.provider,
+                                        onClick = { activeProvider = option.provider },
+                                        label = {
+                                            Text(
+                                                option.providerName,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        },
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                    )
                                 }
                             }
                         }
+                        Column(Modifier.weight(0.6f)) {
+                            Text("Model", style = MaterialTheme.typography.labelMedium)
+                            LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+                                items(models, key = { "${it.provider}:${it.model}" }) { option ->
+                                    TextButton(
+                                        onClick = {
+                                            onSelect(option)
+                                            open = false
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                                    ) {
+                                        Row(
+                                            Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Text(
+                                                option.model,
+                                                modifier = Modifier.weight(1f),
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                            if (option == selected) {
+                                                Text("Selected", style = MaterialTheme.typography.labelSmall)
+                                            }
+                                        }
+                                    }
+                                }
+                                if (provider != null && models.isEmpty()) {
+                                    item { Text("No models match.", style = MaterialTheme.typography.bodySmall) }
+                                }
+                            }
+                        }
+                    }
+                    if (providers.isEmpty()) {
+                        Text("No configured models match.", Modifier.padding(top = 8.dp))
                     }
                 }
             },
