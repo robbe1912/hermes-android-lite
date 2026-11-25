@@ -47,6 +47,7 @@ class App : Application() {
         // Voice settings loads the installed voices. The output switch also starts the engine.
         appScope.launch { settings.readAloud.collect { if (it) readAloud.prepare() } }
         appScope.launch { settings.ttsVoice.collect { readAloud.selectVoice(it) } }
+        appScope.launch { settings.ttsRate.collect { readAloud.selectSpeechRate(it) } }
     }
 
     /**

@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.CoroutineScope
@@ -112,6 +113,8 @@ class Settings(private val context: Context) {
     val readAloud = MutableStateFlow(false)
     /** null uses the device's default text-to-speech voice. */
     val ttsVoice = MutableStateFlow<String?>(null)
+    /** Speech rate for the device's text-to-speech engine. */
+    val ttsRate = MutableStateFlow(1f)
 
     fun loadAsync(scope: CoroutineScope) {
         scope.launch {
@@ -124,6 +127,7 @@ class Settings(private val context: Context) {
             installId.value = stored?.get(INSTALL_ID)?.takeIf { it.isNotBlank() } ?: newInstallId()
             readAloud.value = stored?.get(READ_ALOUD) ?: false
             ttsVoice.value = stored?.get(TTS_VOICE)
+            ttsRate.value = stored?.get(TTS_RATE) ?: 1f
             server.value = ServerConfig(
                 address = stored?.get(ADDRESS) ?: "",
                 https = stored?.get(HTTPS) ?: false,
@@ -178,13 +182,21 @@ class Settings(private val context: Context) {
         }
         ttsVoice.value = name
     }
+    /** Stores the device text-to-speech rate. */
+    suspend fun saveTtsRate(rate: Float) {
+        val boundedRate = rate.coerceIn(0.5f, 2f)
+        context.store.edit { stored -> stored[TTS_RATE] = boundedRate }
+        ttsRate.value = boundedRate
+    }
 
     /** Forgets the gateway and the Firebase project. The app shows the setup screen again. */
     suspend fun clear() {
         context.store.edit { stored ->
+            val rate = stored[TTS_RATE]
             val voice = stored[TTS_VOICE]
             stored.clear()
             stored[READ_ALOUD] = readAloud.value
+            rate?.let { stored[TTS_RATE] = it }
             voice?.let { stored[TTS_VOICE] = it }
         }
         server.value = ServerConfig()
@@ -213,5 +225,6 @@ class Settings(private val context: Context) {
         val INSTALL_ID = stringPreferencesKey("install_id")
         val READ_ALOUD = booleanPreferencesKey("read_aloud")
         val TTS_VOICE = stringPreferencesKey("tts_voice")
+        val TTS_RATE = floatPreferencesKey("tts_rate")
     }
 }

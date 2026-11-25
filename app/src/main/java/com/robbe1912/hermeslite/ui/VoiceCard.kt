@@ -17,10 +17,12 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Slider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -42,15 +44,16 @@ internal fun VoiceCard() {
     val voices by app.readAloud.voices.collectAsStateWithLifecycle()
     val voicesLoaded by app.readAloud.voicesLoaded.collectAsStateWithLifecycle()
     val engineError by app.readAloud.voiceEngineError.collectAsStateWithLifecycle()
+    val speechRate by app.settings.ttsRate.collectAsStateWithLifecycle()
+    var displayedRate by remember { mutableFloatStateOf(speechRate) }
+    LaunchedEffect(speechRate) { displayedRate = speechRate }
     var showPicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { app.readAloud.prepare() }
 
     fun chooseVoice(name: String?) {
-        scope.launch {
-            app.settings.saveTtsVoice(name)
-            app.readAloud.selectVoice(name)
-        }
+        app.readAloud.selectVoice(name)
+        scope.launch { app.settings.saveTtsVoice(name) }
     }
 
     Column(
@@ -72,6 +75,20 @@ internal fun VoiceCard() {
                 ?: if (selectedVoice == null) "Device default voice" else "Saved voice is not available",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            "Speech speed · ${String.format(Locale.getDefault(), "%.1f", displayedRate)}×",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Slider(
+            value = displayedRate,
+            onValueChange = { displayedRate = it },
+            onValueChangeFinished = {
+                app.readAloud.selectSpeechRate(displayedRate)
+                scope.launch { app.settings.saveTtsRate(displayedRate) }
+            },
+            valueRange = 0.5f..2f,
+            steps = 14,
         )
         TextButton(onClick = { showPicker = true }) { Text("Choose English voice") }
     }
@@ -113,7 +130,10 @@ internal fun VoiceCard() {
             },
             confirmButton = {
                 Row {
-                    TextButton(onClick = app.readAloud::preview, enabled = voicesLoaded) { Text("Preview") }
+                    TextButton(
+                        onClick = { app.readAloud.preview(selectedVoice, displayedRate) },
+                        enabled = voicesLoaded,
+                    ) { Text("Preview") }
                     TextButton(onClick = { showPicker = false }) { Text("Done") }
                 }
             },

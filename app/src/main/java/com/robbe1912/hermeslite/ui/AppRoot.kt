@@ -146,6 +146,7 @@ fun AppRoot() {
                 title = screen.title,
                 snackbar = snackbar,
                 onBack = { navigator.pop() },
+                onVoiceSettings = { navigator.push(Screen.Settings) },
                 onCreated = { id ->
                     app.threads.adopt(id)
                     navigator.replaceAll(Screen.Channels, Screen.Thread(id, ""))

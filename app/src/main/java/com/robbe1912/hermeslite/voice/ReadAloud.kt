@@ -11,7 +11,7 @@ import java.util.Locale
 /**
  * Reads answers aloud with the text-to-speech engine of the device.
  *
- * The engine starts when the user turns the setting on, so the first answer does not wait for it.
+ * The engine starts when the user opens voice settings or turns read aloud on.
  */
 class ReadAloud(context: Context) {
     private val appContext = context.applicationContext
@@ -21,6 +21,7 @@ class ReadAloud(context: Context) {
     private var ready = false
     private var pending: String? = null
     private var selectedVoiceName: String? = null
+    private var selectedSpeechRate = 1f
 
     /** English voices that the device's current text-to-speech engine provides. */
     val voices = MutableStateFlow<List<Voice>>(emptyList())
@@ -45,6 +46,13 @@ class ReadAloud(context: Context) {
             if (ready) applyVoice()
         }
     }
+    /** Applies the selected speech rate to assistant replies and previews. */
+    fun selectSpeechRate(rate: Float) {
+        synchronized(lock) {
+            selectedSpeechRate = rate.coerceIn(0.5f, 2f)
+            if (ready) applySpeechRate()
+        }
+    }
 
     /** Reads [text] and drops Markdown marks that a voice should not read. */
     fun speak(text: String) {
@@ -55,15 +63,23 @@ class ReadAloud(context: Context) {
             if (ready) {
                 engine?.speak(clean, TextToSpeech.QUEUE_FLUSH, null, "answer")
                 speaking.value = true
-                Log.i("HermesLite", "Reads ${clean.length} characters aloud")
+                Log.i("HermesLite", "TTS voice=${engine?.voice?.name} rate=$selectedSpeechRate; ${clean.length} chars")
             } else {
                 pending = clean
             }
         }
     }
 
-    /** Speaks a short sample with the selected voice. */
-    fun preview() {
+    /** Speaks a sample after applying the exact voice and speed selected in the picker. */
+    fun preview(voiceName: String?, speechRate: Float) {
+        synchronized(lock) {
+            selectedVoiceName = voiceName
+            selectedSpeechRate = speechRate.coerceIn(0.5f, 2f)
+            if (ready) {
+                applyVoice()
+                applySpeechRate()
+            }
+        }
         speak("Hello. This is a sample of the selected voice.")
     }
 
@@ -97,6 +113,7 @@ class ReadAloud(context: Context) {
                         .thenBy { it.name },
                 )
             applyVoice()
+            applySpeechRate()
             engine?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) = Unit
                 override fun onDone(utteranceId: String?) {
@@ -116,8 +133,20 @@ class ReadAloud(context: Context) {
     private fun applyVoice() {
         val tts = engine ?: return
         val selected = selectedVoiceName?.let { name -> voices.value.firstOrNull { it.name == name } }
-        if (selected != null && tts.setVoice(selected) == TextToSpeech.SUCCESS) return
+        if (selected != null) {
+            val status = tts.setVoice(selected)
+            if (status == TextToSpeech.SUCCESS) return
+            Log.w("HermesLite", "Could not select TTS voice ${selected.name}: status $status")
+        }
         tts.language = Locale.getDefault()
+    }
+
+    private fun applySpeechRate() {
+        val tts = engine ?: return
+        val status = tts.setSpeechRate(selectedSpeechRate)
+        if (status != TextToSpeech.SUCCESS) {
+            Log.w("HermesLite", "Could not set TTS speech rate $selectedSpeechRate: status $status")
+        }
     }
 }
 

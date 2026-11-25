@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,7 +36,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -59,6 +60,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.content.ContextCompat
@@ -75,6 +80,7 @@ internal fun ThreadScreen(
     title: String,
     snackbar: SnackbarHostState,
     onBack: () -> Unit,
+    onVoiceSettings: () -> Unit,
     onCreated: (String) -> Unit,
 ) {
     val state by model.state.collectAsStateWithLifecycle()
@@ -178,6 +184,7 @@ internal fun ThreadScreen(
                         else -> mic.launch(Manifest.permission.RECORD_AUDIO)
                     }
                 },
+                onVoiceSettings = onVoiceSettings,
                 onSend = { model.send(onCreated) },
                 onStop = model::stop,
             )
@@ -543,6 +550,7 @@ private fun Composer(
     voiceOutput: Boolean,
     onVoiceOutput: (Boolean) -> Unit,
     onVoice: () -> Unit,
+    onVoiceSettings: () -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit,
 ) {
@@ -578,10 +586,22 @@ private fun Composer(
                 enabled = enabled,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             )
-            IconToggleButton(checked = voiceOutput, onCheckedChange = onVoiceOutput) {
+            Box(
+                Modifier
+                    .size(48.dp)
+                    .combinedClickable(
+                        role = Role.Switch,
+                        onClickLabel = if (voiceOutput) "Turn off voice output" else "Turn on voice output",
+                        onLongClickLabel = "Open voice settings",
+                        onClick = { onVoiceOutput(!voiceOutput) },
+                        onLongClick = onVoiceSettings,
+                    )
+                    .semantics { toggleableState = if (voiceOutput) ToggleableState.On else ToggleableState.Off },
+                contentAlignment = Alignment.Center,
+            ) {
                 Icon(
                     Icons.Default.RecordVoiceOver,
-                    contentDescription = if (voiceOutput) "Turn off voice output" else "Turn on voice output",
+                    contentDescription = if (voiceOutput) "Voice output on" else "Voice output off",
                     tint = if (voiceOutput) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
