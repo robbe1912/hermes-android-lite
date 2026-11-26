@@ -72,8 +72,8 @@ android {
         applicationId = "com.robbe1912.hermeslite"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.1.2"
+        versionCode = 4
+        versionName = "0.1.3"
         ndk {
             abiFilters += tunnelAbis
         }
@@ -141,6 +141,7 @@ dependencies {
     "implementation"("com.google.firebase:firebase-messaging:26.0.2")
     "debugImplementation"("androidx.compose.ui:ui-tooling")
     "testImplementation"("junit:junit:4.13.2")
+    "testImplementation"("com.squareup.okhttp3:mockwebserver3:5.5.1")
 }
 
 // The tunnel library is an input of every compile step.

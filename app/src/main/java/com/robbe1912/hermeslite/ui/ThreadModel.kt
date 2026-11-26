@@ -3,6 +3,7 @@ package com.robbe1912.hermeslite.ui
 import com.robbe1912.hermeslite.gateway.GatewayApi
 import com.robbe1912.hermeslite.gateway.GatewayEvent
 import com.robbe1912.hermeslite.gateway.GatewayException
+import com.robbe1912.hermeslite.gateway.GatewayRpcError
 import com.robbe1912.hermeslite.gateway.GatewaySocket
 import com.robbe1912.hermeslite.gateway.ServerRequest
 import com.robbe1912.hermeslite.gateway.StoredMessage
@@ -219,6 +220,7 @@ class ThreadModel internal constructor(
     }
 
     private suspend fun create(onCreated: (String) -> Unit, choice: ThreadModelOption?): String {
+        ensureSourceAvailable("gui")
         val result = backend.call(
             "session.create",
             buildJsonObject {
@@ -253,12 +255,58 @@ class ThreadModel internal constructor(
         )
         val runtime = result.str("session_id") ?: throw GatewayException("The gateway gave no session id.")
         runtimeId = runtime
-        if (result.bool("running") == true) state.update { it.copy(streaming = true) }
-        replay(runtime)
+        val running = result.bool("running") == true
+        if (running) state.update { it.copy(streaming = true) }
+        val replayUnavailable = replay(runtime)
+        result.obj("inflight")?.let {
+            restoreInflight(it, force = replayUnavailable || !running)
+        }
         loadModelOptions(runtime)
     }
 
-    private suspend fun replay(runtime: String) {
+    private suspend fun ensureSourceAvailable(source: String) {
+        val description = try {
+            backend.call("runtime.describe", JsonObject(emptyMap()))
+        } catch (e: GatewayRpcError) {
+            if (e.code == -32601) return
+            throw e
+        }
+        val sources = description.obj("session_create")?.texts("sources") ?: return
+        if (source !in sources) {
+            throw GatewayException("This gateway does not allow $source sessions.")
+        }
+    }
+
+    private fun restoreInflight(inflight: JsonObject, force: Boolean) {
+        val displayKind = inflight.str("display_kind")
+        val displayMetadata = inflight.obj("display_metadata")
+        val userText = when (displayKind) {
+            "hidden" -> null
+            "process_complete" -> displayMetadata?.str("display_text")
+            else -> inflight.str("user")
+        }
+        val assistantText = inflight.str("assistant").orEmpty()
+        val reasoning = inflight.str("reasoning") ?: inflight.str("reasoning_content").orEmpty()
+        val streaming = inflight.bool("streaming") == true
+        val error = inflight.str("error") ?: inflight.str("error_message")
+
+        state.update { current ->
+            val last = current.rows.lastOrNull() as? Row.Message
+            if (!force && !current.streaming) return@update current
+            if (!force && last?.let { !it.fromUser && it.streaming } == true) return@update current
+
+            val rows = current.rows.toMutableList()
+            if (!userText.isNullOrBlank() && rows.lastOrNull() != Row.Message("user", userText)) {
+                rows += Row.Message("user", userText)
+            }
+            if (assistantText.isNotEmpty() || reasoning.isNotEmpty() || streaming) {
+                rows += Row.Message("assistant", assistantText, reasoning, streaming)
+            }
+            current.copy(rows = rows, streaming = streaming, error = error ?: current.error)
+        }
+    }
+
+    private suspend fun replay(runtime: String): Boolean {
         // An older gateway has no replay. Then the history shows the stored state.
         val result = runCatching {
             backend.call(
@@ -268,11 +316,11 @@ class ThreadModel internal constructor(
                     put("last_seen", state.value.lastSeq)
                 },
             )
-        }.getOrNull() ?: return
+        }.getOrNull() ?: return true
         val stored = realStoredId
         if (result.bool("truncated") == true && stored != null) {
             loadHistory(stored)
-            return
+            return true
         }
         result.arr("events")?.forEach { element ->
             val params = element as? JsonObject ?: return@forEach
@@ -280,7 +328,9 @@ class ThreadModel internal constructor(
             state.update { it.event(type, params.number("seq")?.toLong(), params.obj("payload") ?: JsonObject(emptyMap())) }
         }
         result.arr("open_requests")?.forEach { element -> restoreRequest(element as? JsonObject) }
+        return false
     }
+
 
     /** A request that was open before the socket dropped is still open. Show it again. */
     private fun restoreRequest(snapshot: JsonObject?) {

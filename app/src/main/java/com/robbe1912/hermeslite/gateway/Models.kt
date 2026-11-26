@@ -51,13 +51,20 @@ internal fun JsonObject.toChannelRow() = ChannelRow(
 )
 
 /** One stored message of a thread. */
-data class StoredMessage(val role: String, val text: String, val reasoning: String, val toolName: String)
+data class StoredMessage(
+    val role: String,
+    val text: String,
+    val reasoning: String,
+    val toolName: String,
+    val displayKind: String = "",
+)
 
 internal fun JsonObject.toStoredMessage() = StoredMessage(
     role = str("role").orEmpty(),
     text = str("content").orEmpty(),
     reasoning = str("reasoning") ?: str("reasoning_content") ?: "",
     toolName = str("tool_name").orEmpty(),
+    displayKind = str("display_kind").orEmpty(),
 )
 
 /** One cron job of the gateway. Times are epoch seconds, or 0 when the gateway sent none. */

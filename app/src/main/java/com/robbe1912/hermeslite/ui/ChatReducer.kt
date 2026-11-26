@@ -85,6 +85,7 @@ internal fun ThreadState.removeUser(text: String): ThreadState {
 internal fun historyRows(messages: List<StoredMessage>): List<Row> {
     val rows = ArrayList<Row>(messages.size)
     for (message in messages) {
+        if (message.displayKind == "hidden") continue
         when (message.role) {
             "user" -> if (message.text.isNotBlank()) rows += Row.Message("user", message.text)
             "assistant" -> if (message.text.isNotBlank() || message.reasoning.isNotBlank()) {

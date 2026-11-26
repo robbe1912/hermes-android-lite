@@ -150,9 +150,9 @@ class GatewayApi(internal val settings: Settings, internal val tunnel: TunnelCon
             ?.filter { it.source != "cron" }
             ?: emptyList()
 
-    /** The newest [limit] stored messages of a thread, oldest first. */
+    /** The latest [limit] stored messages of a thread, in chronological order. */
     suspend fun messages(storedId: String, limit: Int = 200): List<StoredMessage> =
-        request("GET", "api/sessions/$storedId/messages", mapOf("limit" to limit.toString(), "offset" to "0", "order" to "oldest"))
+        request("GET", "api/sessions/$storedId/messages", mapOf("limit" to limit.toString(), "offset" to "0", "order" to "latest"))
             .jsonObject.arr("messages")
             ?.map { it.jsonObject.toStoredMessage() }
             ?: emptyList()

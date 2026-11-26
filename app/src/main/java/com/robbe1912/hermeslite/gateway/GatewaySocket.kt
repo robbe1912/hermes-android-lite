@@ -15,6 +15,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
+import okhttp3.HttpUrl
+import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
@@ -34,7 +36,11 @@ class GatewayEvent(val type: String, val sessionId: String, val seq: Long?, val 
  * The socket opens with [ensureConnected]. When it drops, the next call opens it again.
  * Callers that need a stream read [events] and [requests].
  */
-class GatewaySocket(private val api: GatewayApi) {
+class GatewaySocket internal constructor(
+    private val client: OkHttpClient,
+    private val webSocketUrl: suspend () -> HttpUrl,
+) {
+    constructor(api: GatewayApi) : this(api.client, api::webSocketUrl)
     private val eventFlow = MutableSharedFlow<GatewayEvent>(extraBufferCapacity = 4096)
     val events: SharedFlow<GatewayEvent> = eventFlow.asSharedFlow()
 
@@ -49,14 +55,17 @@ class GatewaySocket(private val api: GatewayApi) {
     private val nextId = AtomicLong()
     private val connectLock = Mutex()
 
-    /** Opens the socket when it is closed. Returns after the gateway sent `gateway.ready`. */
+    /** Opens the socket and negotiates its capabilities after `gateway.ready`. */
     suspend fun ensureConnected() {
         if (connected.value) return
         connectLock.withLock {
             if (connected.value) return
             val ready = CompletableDeferred<Unit>()
-            val opened = api.client.newWebSocket(
-                Request.Builder().url(api.webSocketUrl()).build(),
+            val opened = client.newWebSocket(
+                Request.Builder()
+                    .url(webSocketUrl())
+                    .header("Sec-WebSocket-Protocol", SOCKET_PROTOCOL)
+                    .build(),
                 object : WebSocketListener() {
                     override fun onMessage(webSocket: WebSocket, text: String) = handle(text, ready)
 
@@ -71,18 +80,23 @@ class GatewaySocket(private val api: GatewayApi) {
             socket = opened
             try {
                 withTimeout(READY_TIMEOUT_MS) { ready.await() }
+                callConnected("client.capabilities", buildJsonObject { put("server_requests", true) })
+                connected.value = true
             } catch (e: Exception) {
                 opened.cancel()
                 lost(opened)
-                throw GatewayException("The gateway socket did not open.", e)
+                throw GatewayException("The gateway socket did not become ready.", e)
             }
-            connected.value = true
         }
     }
 
     /** Calls one gateway method and returns its result. Throws [GatewayRpcError] on a gateway error. */
     suspend fun call(method: String, params: JsonObject = JsonObject(emptyMap())): JsonObject {
         ensureConnected()
+        return callConnected(method, params)
+    }
+
+    private suspend fun callConnected(method: String, params: JsonObject): JsonObject {
         val id = nextId.incrementAndGet()
         val answer = CompletableDeferred<JsonObject>()
         pending[id] = answer
@@ -177,6 +191,7 @@ class GatewaySocket(private val api: GatewayApi) {
     }
 
     private companion object {
+        const val SOCKET_PROTOCOL = "hermes-gateway-v1"
         const val READY_TIMEOUT_MS = 20_000L
         const val CALL_TIMEOUT_MS = 60_000L
     }

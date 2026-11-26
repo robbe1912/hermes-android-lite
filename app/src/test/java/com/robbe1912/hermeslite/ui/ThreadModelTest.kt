@@ -67,12 +67,45 @@ class ThreadModelTest {
             thread.send()
             await { gateway.calls.any { it.first == "prompt.submit" } }
 
+            val describe = gateway.calls.indexOfFirst { it.first == "runtime.describe" }
+            val createIndex = gateway.calls.indexOfFirst { it.first == "session.create" }
+            assertTrue(describe >= 0 && describe < createIndex)
+            assertEquals("gui", gateway.calls[createIndex].second.str("source"))
             val create = gateway.calls.single { it.first == "session.create" }.second
             val submit = gateway.calls.single { it.first == "prompt.submit" }.second
             assertEquals("zai", create.str("provider"))
             assertEquals("glm-5.3", create.str("model"))
             assertEquals("runtime-new", submit.str("session_id"))
             assertFalse(gateway.calls.any { it.first == "command.dispatch" })
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun resumeRestoresInflightTurnAfterTruncatedReplay() = runBlocking {
+        val gateway = FakeThreadBackend().apply {
+            replayTruncated = true
+            resumeInflight = buildJsonObject {
+                put("user", "Continue the draft")
+                put("assistant", "Partial answer")
+                put("streaming", true)
+            }
+        }
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val thread = ThreadModel("stored-1", gateway, scope) {}
+            thread.open()
+            await { thread.state.value.rows.any { it is Row.Message && it.text == "Partial answer" } }
+
+            assertEquals(
+                listOf(
+                    Row.Message("user", "Continue the draft"),
+                    Row.Message("assistant", "Partial answer", streaming = true),
+                ),
+                thread.state.value.rows,
+            )
+            assertTrue(thread.state.value.streaming)
         } finally {
             scope.cancel()
         }
@@ -117,6 +150,8 @@ private class FakeThreadBackend : ThreadBackend {
     override val events = MutableSharedFlow<GatewayEvent>(extraBufferCapacity = 8)
     override val requests = MutableSharedFlow<ServerRequest>(extraBufferCapacity = 8)
     val calls = mutableListOf<Pair<String, JsonObject>>()
+    var replayTruncated = false
+    var resumeInflight: JsonObject? = null
 
     override suspend fun ensureConnected() {
         connected.value = true
@@ -128,12 +163,22 @@ private class FakeThreadBackend : ThreadBackend {
             throw IllegalStateException("not a quick/plugin/bundle/skill command: ${params.str("name")}")
         }
         return when (method) {
-            "session.resume" -> buildJsonObject { put("session_id", "runtime-1") }
+            "runtime.describe" -> buildJsonObject {
+                put("session_create", buildJsonObject {
+                    put("sources", JsonArray(listOf(JsonPrimitive("gui"))))
+                })
+            }
+            "session.resume" -> buildJsonObject {
+                put("session_id", "runtime-1")
+                put("running", resumeInflight != null)
+                resumeInflight?.let { put("inflight", it) }
+            }
             "session.create" -> buildJsonObject {
                 put("session_id", "runtime-new")
                 put("stored_session_id", "stored-new")
             }
             "session.events.since" -> buildJsonObject {
+                put("truncated", replayTruncated)
                 put("events", JsonArray(emptyList()))
                 put("open_requests", JsonArray(emptyList()))
             }

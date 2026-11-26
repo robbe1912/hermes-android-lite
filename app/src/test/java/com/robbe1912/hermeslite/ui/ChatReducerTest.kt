@@ -1,6 +1,7 @@
 package com.robbe1912.hermeslite.ui
 
 import com.robbe1912.hermeslite.gateway.StoredMessage
+import com.robbe1912.hermeslite.gateway.toStoredMessage
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -100,5 +101,20 @@ class ChatReducerTest {
         assertEquals(3, rows.size)
         assertEquals("terminal", (rows[1] as Row.Tool).name)
         assertEquals("because", (rows[2] as Row.Message).reasoning)
+    }
+    @Test
+    fun hiddenTranscriptRowsAreNotRendered() {
+        val rows = historyRows(
+            listOf(
+                buildJsonObject {
+                    put("role", "user")
+                    put("content", "internal prompt")
+                    put("display_kind", "hidden")
+                }.toStoredMessage(),
+                StoredMessage("assistant", "visible reply", "", ""),
+            ),
+        )
+
+        assertEquals(listOf(Row.Message("assistant", "visible reply")), rows)
     }
 }
