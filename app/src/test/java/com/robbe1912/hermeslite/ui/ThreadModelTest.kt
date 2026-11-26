@@ -44,8 +44,7 @@ class ThreadModelTest {
             val switch = gateway.calls.indexOfFirst { it.first == "command.dispatch" }
             val submit = gateway.calls.indexOfFirst { it.first == "prompt.submit" }
             assertTrue(switch >= 0 && switch < submit)
-            assertEquals("model", gateway.calls[switch].second.str("name"))
-            assertEquals("zai:glm-5.3", gateway.calls[switch].second.str("arg"))
+            assertEquals("/model zai:glm-5.3", gateway.calls[switch].second.str("command"))
             assertEquals("runtime-1", gateway.calls[switch].second.str("session_id"))
             assertEquals("runtime-1", gateway.calls[submit].second.str("session_id"))
             assertFalse(gateway.calls.any { it.first == "session.create" })
@@ -79,6 +78,35 @@ class ThreadModelTest {
         }
     }
 
+    @Test
+    fun cancelThenChangeModelAllowsSendingAgain() = runBlocking {
+        val gateway = FakeThreadBackend()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val thread = ThreadModel("stored-1", gateway, scope) {}
+            thread.open()
+            await { gateway.calls.any { it.first == "model.options" } && !thread.modelsLoading.value }
+
+            thread.input.value = "First message"
+            thread.send()
+            await { gateway.calls.count { it.first == "prompt.submit" } == 1 }
+
+            thread.stop()
+            await { gateway.calls.any { it.first == "session.interrupt" } && !thread.state.value.streaming }
+
+            thread.selectModel(thread.availableModels.value.single { it.model == "glm-5.3" })
+            thread.input.value = "Second message"
+            thread.send()
+
+            assertEquals(2, gateway.calls.count { it.first == "prompt.submit" })
+            assertEquals(null, thread.state.value.error)
+            assertEquals("", thread.input.value)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+
     private suspend fun await(condition: () -> Boolean) = withTimeout(2_000) {
         while (!condition()) yield()
     }
@@ -96,6 +124,9 @@ private class FakeThreadBackend : ThreadBackend {
 
     override suspend fun call(method: String, params: JsonObject): JsonObject {
         calls += method to params
+        if (method == "command.dispatch" && params.str("command") == null) {
+            throw IllegalStateException("not a quick/plugin/bundle/skill command: ${params.str("name")}")
+        }
         return when (method) {
             "session.resume" -> buildJsonObject { put("session_id", "runtime-1") }
             "session.create" -> buildJsonObject {

@@ -170,8 +170,7 @@ class ThreadModel internal constructor(
                         "command.dispatch",
                         buildJsonObject {
                             put("session_id", runtime)
-                            put("name", "model")
-                            put("arg", "${choice.provider}:${choice.model}")
+                            put("command", "/model ${choice.provider}:${choice.model}")
                         },
                     )
                     appliedModel = choice
